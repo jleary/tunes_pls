@@ -12,48 +12,47 @@ use Try::Tiny;
 use POSIX qw/ceil/;
 use Encode;
 use URI::Escape;
+use File::Copy;
+use File::Spec;
 use Getopt::Long;
 
 binmode(STDOUT, ":utf8");
 &tui;
 
 
-my $library;  # = Mac::iTunes::Library::XML->parse("/home/jleary/Music/iTunes/iTunes\ Music\ Library.xml") or die "Could Not Open Library";
-my %playlists;# = $library->playlists(); #I'll get rid of this soon
+my $library;  
+my %playlists;
 my %playlist_tree;
 my %persistent_id_map;
 
 
 &tui;
 
-#&print_playlists(\@{$playlist_tree{'roots'}},1);
-#&export(selected_playlists=>\@selected_playlists,export_to=>'m3u');
-
 sub tui{
-    my $in_path ='';
-    my $out_path='';
+    my $in_dir ='';
+    my $out_dir ='';
     my $sub     ='';
     my $selected_playlists='';
     my $type    ='';
-    GetOptions( 'in=s'        =>\$in_path,
-                'out:s'       =>\$out_path,
+    GetOptions( 'in=s'        =>\$in_dir,
+                'out:s'       =>\$out_dir,
                 'action=s'    =>\$sub,
                 'playlists:s' =>\$selected_playlists,
                 'type:s'      =>\$type,
     );
     #Set shared vars 
-    &init_vars($in_path);
+    &init_vars($in_dir);
     if($sub eq 'list'){
         &print_playlists(\@{$playlist_tree{'roots'}});
     }elsif($sub eq 'export'){
         my @s = split / /, $selected_playlists;
-        &export(selected_playlists=>\@s,export_to=>$type,out_path=>$out_path);
+        &export(selected_playlists=>\@s,export_to=>$type,in_dir=>$in_dir,out_dir=>$out_dir);
     }
     exit;
     
 }
 sub init_vars{
-    $library   = Mac::iTunes::Library::XML->parse($_[0]) or die "Could Not Open Library"; 
+    $library   = Mac::iTunes::Library::XML->parse("$_[0]/iTunes Music Library.xml") or die "Could Not Open Library"; 
     %playlists = $library->playlists();
     (%playlist_tree,%persistent_id_map) = &build_playlist_tree($library);
 
@@ -75,8 +74,6 @@ sub build_playlist_tree{
     my %out;
     # Initial loop
     foreach(keys %playlists){
-        #Four Hardcoded Playlists: Will be removed when finished
-        #push @selected_playlists, $_ if ($playlists{$_}->name =~ /(Lingua Franca|La Francophonie|Die Germanosphere|untitled playlist 2)/);
         my $pls_id=$_;
         #1. Record Roots
         #2. Record Parent->Child Relationships
@@ -98,7 +95,8 @@ sub build_playlist_tree{
 #Usage:
 #    export(selected_playlists=>\@array,
 #           export_protected=>1 or 0
-#           export_to=>\&export function)
+#           export_to=>\&export function,
+#           path=> path of playlist and music)
 
 
 sub export{
@@ -110,21 +108,27 @@ sub export{
     );
     my $handler = $handlers{$opt{'export_to'}} or die "Invalid Export Function";
     foreach (@{$opt{'selected_playlists'}}) {
-        try{
-            $handler->($playlists{$_},'/tmp/test2.pls', $export_protected);
-        }catch{
+        #try{
+            $handler->( $playlists{$_},
+                        $opt{'in_dir'},
+                        File::Spec->rel2abs($opt{'out_dir'}),
+                        $playlists{$_}->name.".$opt{'export_to'}", 
+                        $export_protected);
+       # }catch{
             #Note: The playlist library crashes on null playlists
-            warn "Warning: Playlist has null contents.";
-        };
+        #    warn "Warning: Playlist has null contents.";
+        #};
     }
 }
 
 sub export_to_pls{
-    my $playlist = $_[0];
-    my @items=$_[0]->items;
-    my $music_folder = $library->musicFolder();
-    open(my $pls,'+>',$_[1]) or die "Could not open pls to write.";
+    my ($playlist,$in_dir,$out_dir,$pls_path) = @_;
+    my @items=$playlist->items;
+    open(my $pls,'+>',"$out_dir/$pls_path") or die "Could not open pls to write.";
+
     binmode($pls,':utf8');
+
+    my $music_folder = $library->musicFolder();
 
     print $pls "[playlist]\n";
     my $i = 0;
@@ -143,6 +147,7 @@ sub export_to_pls{
         print $pls "File"  , $i+1, "=", $location,"\n";
         print $pls "Title" , $i+1, "=", $items[$i]->name,"\n";
         print $pls "Length", $i+1, "=", $length  ,"\n";
+        &copy_path($in_dir,$out_dir,$location);
     }
     print $pls "NumberOfEntries=$i\n";
     print $pls "Version=2\n\n";
@@ -151,12 +156,12 @@ sub export_to_pls{
 
 }
 sub export_to_m3u{
-    my $playlist = $_[0];
-    my @items=$_[0]->items;
-    my $music_folder = $library->musicFolder();
-
-    open(my $m3u,'+>',$_[1]) or die "Could not open m3u to write.";
+    my ($playlist,$in_dir,$out_dir,$m3u_path) = @_;
+    my @items=$playlist->items;
+    open(my $m3u,'+>',"$out_dir/$m3u_path") or die "Could not open m3u to write.";
     binmode($m3u,':utf8');
+
+    my $music_folder = $library->musicFolder();
 
     print $m3u "#EXTM3U\n";
     foreach(@items){
@@ -172,6 +177,21 @@ sub export_to_m3u{
         $length = ceil($_->totalTime/1000) if defined $_->totalTime;
         print $m3u "#EXTINF:",$length," ",$_->artist," - ",$_->name,"\n";
         print $m3u "$location\n";
+        &copy_path($in_dir,$out_dir,$location);
     }
     close $m3u;
+}
+
+sub copy_path{
+    my ($in_dir,$out_dir,$location) = @_;
+    my @dirs = split /\//,$location;
+    my $file = pop @dirs;
+    chdir $out_dir;
+    foreach(@dirs){
+        mkdir $_;
+        chdir $_;
+    }
+    print "$in_dir/iTunes Music/$location -> $file\n";
+    copy("$in_dir/iTunes Music/$location",$file) or die $!;
+    chdir $out_dir;
 }
