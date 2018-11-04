@@ -29,23 +29,26 @@ my %persistent_id_map;
 &tui;
 
 sub tui{
-    my $in_dir ='';
-    my $out_dir ='';
-    my $sub     ='';
-    my $selected_playlists='';
-    my $type    ='';
+    my $in_dir              ='';
+    my $out_dir             ='';
+    my $sub                 ='';
+    my $selected_playlists  ='';
+    my $type                ='';
+    my $export_protected    ='';
     GetOptions( 'in=s'        =>\$in_dir,
                 'out:s'       =>\$out_dir,
                 'action=s'    =>\$sub,
                 'playlists:s' =>\$selected_playlists,
                 'type:s'      =>\$type,
+                'export_protectd:s' =>\$export_protected,
     );
     #Set shared vars 
     &init_vars($in_dir);
     if($sub eq 'list'){
         &print_playlists(\@{$playlist_tree{'roots'}});
     }elsif($sub eq 'export'){
-        my @s = split / /, $selected_playlists;
+        my @s = split /,/, $selected_playlists;
+        $export_protected = '' if lc $export_protected !~ /(y(|es)|true)/;
         &export(selected_playlists=>\@s,export_to=>$type,in_dir=>$in_dir,out_dir=>$out_dir);
     }
     exit;
@@ -108,21 +111,24 @@ sub export{
     );
     my $handler = $handlers{$opt{'export_to'}} or die "Invalid Export Function";
     foreach (@{$opt{'selected_playlists'}}) {
+        my $playlist_path = $playlists{$_}->name.".$opt{'export_to'}";
+        $playlist_path =~ s/(\/|\\)/-/g;
         #try{
             $handler->( $playlists{$_},
                         $opt{'in_dir'},
                         File::Spec->rel2abs($opt{'out_dir'}),
-                        $playlists{$_}->name.".$opt{'export_to'}", 
+                        $playlist_path,
                         $export_protected);
-       # }catch{
+        #}catch{
             #Note: The playlist library crashes on null playlists
-        #    warn "Warning: Playlist has null contents.";
+            #Todo: Tighten this try catch statements scope soon
+            #warn "Warning: Playlist has null contents.";
         #};
     }
 }
 
 sub export_to_pls{
-    my ($playlist,$in_dir,$out_dir,$pls_path) = @_;
+    my ($playlist,$in_dir,$out_dir,$pls_path,$export_protected) = @_;
     my @items=$playlist->items;
     open(my $pls,'+>',"$out_dir/$pls_path") or die "Could not open pls to write.";
 
@@ -133,7 +139,7 @@ sub export_to_pls{
     print $pls "[playlist]\n";
     my $i = 0;
     foreach (; $i < scalar @items; $i++){
-        next if($items[$i]->kind =~ /^Protected/ && !$_[2]);
+        next if($items[$i]->kind =~ /^Protected/ && !$export_protected);
         # Handle file location
         my $location = $items[$i]->location;
         if(length $location >= length $music_folder && substr($location,0,(length $music_folder)) eq $music_folder){
@@ -156,7 +162,7 @@ sub export_to_pls{
 
 }
 sub export_to_m3u{
-    my ($playlist,$in_dir,$out_dir,$m3u_path) = @_;
+    my ($playlist,$in_dir,$out_dir,$m3u_path,$export_protected) = @_;
     my @items=$playlist->items;
     open(my $m3u,'+>',"$out_dir/$m3u_path") or die "Could not open m3u to write.";
     binmode($m3u,':utf8');
@@ -166,6 +172,7 @@ sub export_to_m3u{
     print $m3u "#EXTM3U\n";
     foreach(@items){
         # Handle file location
+        next if($_->kind =~ /^Protected/ && !$export_protected);
         my $location = $_->location;
         if(length $location >= length $music_folder && substr($location,0,(length $music_folder)) eq $music_folder){
             $location = substr($location,length $music_folder,);
@@ -191,7 +198,7 @@ sub copy_path{
         mkdir $_;
         chdir $_;
     }
-    print "$in_dir/iTunes Music/$location -> $file\n";
-    copy("$in_dir/iTunes Music/$location",$file) or die $!;
+    print "$location\n";
+    copy("$in_dir/iTunes Music/$location",$file) or warn $!;
     chdir $out_dir;
 }
