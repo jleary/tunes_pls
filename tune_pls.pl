@@ -194,11 +194,12 @@ sub copy_path{
     my @dirs = split /\//,$location;
     my $file = pop @dirs;
     chdir $out_dir;
+    print "$location already exists.\n" and return if -e $location;
     foreach(@dirs){
-        mkdir $_;
+        mkdir $_ if(!-d $_);
         chdir $_;
     }
     print "$location\n";
-    copy("$in_dir/iTunes Music/$location",$file) or warn $!;
+    copy("$in_dir/iTunes Music/$location",$file) or warn "Warning: $! - $location" ;
     chdir $out_dir;
 }
