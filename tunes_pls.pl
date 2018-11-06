@@ -8,7 +8,7 @@ use warnings;
 use Mac::iTunes::Library;
 use Mac::iTunes::Library::XML;
 use Mac::iTunes::Library::Playlist;
-use Try::Tiny;
+use TryCatch;
 use POSIX qw/ceil/;
 use Encode;
 use URI::Escape;
@@ -42,18 +42,42 @@ sub tui{
                 'type:s'      =>\$type,
                 'export_protectd:s' =>\$export_protected,
     );
-    #Set shared vars 
-    &init_vars($in_dir);
     if($sub eq 'list'){
+        #Set shared vars 
+        &init_vars($in_dir);
         &print_playlists(\@{$playlist_tree{'roots'}});
     }elsif($sub eq 'export'){
         my @s = split /,/, $selected_playlists;
         $export_protected = '' if lc $export_protected !~ /(y(|es)|true)/;
         &export(selected_playlists=>\@s,export_to=>$type,in_dir=>$in_dir,out_dir=>$out_dir);
+    }else{
+        &usage;
     }
     exit;
     
 }
+
+sub usage{
+
+    print <<EOF;
+FLAGS:
+--in               - The directory in which the iTunes Music Library.xml file and iTunes Music directory live.
+--out              - The directory to which the playlist files/music will be exported to.
+--action           - Either `list` to get a listing of playlists and their corresponding ID numbers
+                      or `export` to export to the out directory.
+--playlists        - A comma delimited list of playlist ids to be exported.
+--type             - The playlist format to be exported (ether pls or m3u).
+--export_protected - Either "Yes" or "True" to export FairPlay DRM encrypted files or anything else to not export them
+
+An example usage would be as follows:
+
+./tunes_pls.pl --in ~/Music/iTunes/ --action list #To List 
+./tunes_pls.pl --in ~/Music/iTunes/ --action export --type pls --out /tmp/ --playlists 16153,16129 #To Export
+EOF
+
+}
+
+
 sub init_vars{
     $library   = Mac::iTunes::Library::XML->parse("$_[0]/iTunes Music Library.xml") or die "Could Not Open Library"; 
     %playlists = $library->playlists();
@@ -109,8 +133,19 @@ sub export{
         pls =>\&export_to_pls,
         m3u =>\&export_to_m3u
     );
-    my $handler = $handlers{$opt{'export_to'}} or die "Invalid Export Function";
+    my $handler = $handlers{lc $opt{'export_to'}} or die "Invalid Export Function.  Please specify a playlist format of pls or m3u with the --type flag";
+    print "Please use the --playlists flag along with a comma delimited list of playlists\n" and exit 1 if scalar @{$opt{'selected_playlists'}} == 0;
+    print "Please specify an export directory with the --out flag\n" and exit 2 if $opt{'out_dir'} eq ''; 
+
+    &init_vars($opt{'in_dir'});
+
     foreach (@{$opt{'selected_playlists'}}) {
+        #try{
+            $playlists{$_}->name;
+            $playlists{$_}->items;
+        #}catch{
+           # warn "Null Playlist Contents or Title" and next;
+        #}
         my $playlist_path = $playlists{$_}->name.".$opt{'export_to'}";
         $playlist_path =~ s/(\/|\\)/-/g;
         #try{
@@ -122,7 +157,7 @@ sub export{
         #}catch{
             #Note: The playlist library crashes on null playlists
             #Todo: Tighten this try catch statements scope soon
-            #warn "Warning: Playlist has null contents.";
+        #    warn "An error has occured.";
         #};
     }
 }
