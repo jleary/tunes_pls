@@ -72,7 +72,7 @@ FLAGS:
 An example usage would be as follows:
 
 ./tunes_pls.pl --in ~/Music/iTunes/ --action list #To List 
-./tunes_pls.pl --in ~/Music/iTunes/ --action export --type pls --out /tmp/ --playlists 16153,16129 #To Export
+./tunes_pls.pl --in ~/Music/iTunes/ --action export --type pls --out /tmp/ --playlists 6D65D1901B5A9E3B,A212534145F9BE30 #To Export
 EOF
 
 }
@@ -81,7 +81,8 @@ EOF
 sub init_vars{
     $library   = Mac::iTunes::Library::XML->parse("$_[0]/iTunes Music Library.xml") or die "Could Not Open Library"; 
     %playlists = $library->playlists();
-    (%playlist_tree,%persistent_id_map) = &build_playlist_tree($library);
+    $persistent_id_map{$playlists{$_}->{'Playlist Persistent ID'}} = $_ foreach keys %playlists; 
+    (%playlist_tree) = &build_playlist_tree($library);
 
 }
 
@@ -90,14 +91,12 @@ sub print_playlists{
     $level = 1 if !defined $level;
     foreach(@{$arr}){
         print " " x $level;
-        print "$_ -> ",$playlists{$_}->name,"\n";
+        print $playlists{$_}->playlistPersistentID," -> ",$playlists{$_}->name,"\n";
         &print_playlists(\@{$playlist_tree{$_}},$level+1,) if defined $playlist_tree{$_};
     }
 }
 
 sub build_playlist_tree{
-    my %persistent_id_map; #Maps Persistent ID -> Playlist ID
-    $persistent_id_map{$playlists{$_}->{'Playlist Persistent ID'}} = $_ foreach keys %playlists; 
     my %out;
     # Initial loop
     foreach(keys %playlists){
@@ -114,7 +113,7 @@ sub build_playlist_tree{
     foreach(keys %out){
        @{$out{$_}} = sort{$playlists{$a}->name cmp $playlists{$b}->name} @{$out{$_}};
     }
-    return %out,%persistent_id_map;
+    return(%out);
 }
 
 #&export iterates through the selected playlists and passes their items to 
@@ -140,6 +139,7 @@ sub export{
     &init_vars($opt{'in_dir'});
 
     foreach (@{$opt{'selected_playlists'}}) {
+        $_ = $persistent_id_map{$_};
         #try{
             $playlists{$_}->name;
             $playlists{$_}->items;
