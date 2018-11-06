@@ -1,4 +1,4 @@
-%README
+% README
 
 Presently the following flags are valid
 
