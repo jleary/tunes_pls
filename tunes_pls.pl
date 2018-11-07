@@ -140,25 +140,19 @@ sub export{
 
     foreach (@{$opt{'selected_playlists'}}) {
         $_ = $persistent_id_map{$_};
-        #try{
+        try{
             $playlists{$_}->name;
             $playlists{$_}->items;
-        #}catch{
-           # warn "Null Playlist Contents or Title" and next;
-        #}
+        }catch{
+            warn "Null Playlist Contents or Title" and next;
+        }
         my $playlist_path = $playlists{$_}->name.".$opt{'export_to'}";
         $playlist_path =~ s/(\/|\\)/-/g;
-        #try{
-            $handler->( $playlists{$_},
-                        $opt{'in_dir'},
-                        File::Spec->rel2abs($opt{'out_dir'}),
-                        $playlist_path,
-                        $export_protected);
-        #}catch{
-            #Note: The playlist library crashes on null playlists
-            #Todo: Tighten this try catch statements scope soon
-        #    warn "An error has occured.";
-        #};
+        $handler->( $playlists{$_},
+                    $opt{'in_dir'},
+                    File::Spec->rel2abs($opt{'out_dir'}),
+                    $playlist_path,
+                    $export_protected);
     }
 }
 
