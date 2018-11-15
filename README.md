@@ -16,3 +16,10 @@ An example usage would be as follows:
 ```
 
 
+## Todo List / Roadmap
+
++ Json Export Functionality
++ Config file/daemon mode
++ Systemd unit files
++ Deb Package
++ GUI
