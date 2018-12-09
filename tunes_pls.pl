@@ -15,6 +15,7 @@ use URI::Escape;
 use File::Copy;
 use File::Spec;
 use Getopt::Long;
+use Config::Tiny;
 
 binmode(STDOUT, ":utf8");
 &tui;
@@ -22,7 +23,6 @@ binmode(STDOUT, ":utf8");
 
 my $library;  
 my %playlists;
-my %playlist_tree;
 my %persistent_id_map;
 
 
@@ -35,21 +35,32 @@ sub tui{
     my $selected_playlists  ='';
     my $type                ='';
     my $export_protected    ='';
+    my $config              ='';
     GetOptions( 'in=s'        =>\$in_dir,
                 'out:s'       =>\$out_dir,
                 'action=s'    =>\$sub,
                 'playlists:s' =>\$selected_playlists,
                 'type:s'      =>\$type,
-                'export_protectd:s' =>\$export_protected,
+                'export_protected:s' =>\$export_protected,
+                'config:s'    =>\$config,
+
     );
     if($sub eq 'list'){
         #Set shared vars 
         &init_vars($in_dir);
-        &print_playlists(\@{$playlist_tree{'roots'}});
+        &print_playlists(undef,undef);
     }elsif($sub eq 'export'){
         my @s = split /,/, $selected_playlists;
-        $export_protected = '' if lc $export_protected !~ /(y(|es)|true)/;
-        &export(selected_playlists=>\@s,export_to=>$type,in_dir=>$in_dir,out_dir=>$out_dir);
+        $export_protected = 0;
+        $export_protected = 1 if lc $export_protected =~ /(y(|es)|true)/;
+        &export(selected_playlists=>\@s,
+                export_to         =>$type,
+                in_dir            =>$in_dir,
+                out_dir           =>$out_dir,
+                export_protected  =>$export_protected);
+    }elsif($sub eq 'conf'){
+        &config($config);
+    
     }else{
         &usage;
     }
@@ -68,11 +79,26 @@ FLAGS:
 --playlists        - A comma delimited list of playlist ids to be exported.
 --type             - The playlist format to be exported (ether pls or m3u).
 --export_protected - Either "Yes" or "True" to export FairPlay DRM encrypted files or anything else to not export them
+--config           - Path to config file
 
 An example usage would be as follows:
 
 ./tunes_pls.pl --in ~/Music/iTunes/ --action list #To List 
 ./tunes_pls.pl --in ~/Music/iTunes/ --action export --type pls --out /tmp/ --playlists 6D65D1901B5A9E3B,A212534145F9BE30 #To Export
+./tunes_pls.pl --action conf --conf ~/.config/tunes_pls.cfg #To use a config file
+
+An example config file could be in the ini format as follows:
+library   = /home/user/Music/iTunes/
+format    = m3u
+export_to = /tmp/export/
+export_protected = true
+
+[playlists_by_name]
+playlist_0 = 'Playlist Zero' ;Each playlist's name must be encased in single quotes
+playlist_1 = 'Playlist One'  ;Each playlist must use a unique key value
+
+[playlists_by_id]
+playlist_0 = 6D65D1901B5A9E3B
 EOF
 
 }
@@ -82,17 +108,50 @@ sub init_vars{
     $library   = Mac::iTunes::Library::XML->parse("$_[0]/iTunes Music Library.xml") or die "Could Not Open Library"; 
     %playlists = $library->playlists();
     $persistent_id_map{$playlists{$_}->{'Playlist Persistent ID'}} = $_ foreach keys %playlists; 
-    (%playlist_tree) = &build_playlist_tree($library);
+    #(%playlist_tree) = &build_playlist_tree($library);
 
 }
 
+sub config{
+    die "Could Open Config File" if (!$_[0]||!stat $_[0]);
+    my $cfg = Config::Tiny->read($_[0]);
+    &init_vars($cfg->{_}->{'library'});
+    my @persistent_ids;
+    #Handle IDs
+    push @persistent_ids, values %{$cfg->{'playlists_by_id'}};
+    #Handle By Name
+    my %playlist_names = map{$_=>1} values %{$cfg->{'playlists_by_name'}}; 
+    foreach(keys %playlists){
+        push @persistent_ids, $playlists{$_}->{'Playlist Persistent ID'} if $playlist_names{"'".$playlists{$_}->name ."'"};
+    }
+    #Export
+    die "No playlists selected." if scalar @persistent_ids == 0;
+    ##Handle Export Protected
+    if(defined $cfg->{_}->{'export_protected'} && $cfg->{_}->{'export_protected'}=~/(y(|es)|true)/i){
+        $cfg->{_}->{'export_protected'} = 1;
+    }else{
+        $cfg->{_}->{'export_protected'} = 0;
+    }
+    &export(selected_playlists=>\@persistent_ids,
+            export_to=>$cfg->{_}->{'format'},
+            in_dir=>$cfg->{_}->{'library'},
+            out_dir=>$cfg->{_}->{'export_to'},);
+}
+
 sub print_playlists{
-    my($arr,$level)=@_;
-    $level = 1 if !defined $level;
+    my($arr,$level,$tree_addr)=@_;
+    my %playlist_tree;
+    if(!defined $level){
+        %playlist_tree = &build_playlist_tree($library); 
+        $arr   = \@{$playlist_tree{'roots'}};
+        $level = 1;
+    }else{
+        %playlist_tree = %{$tree_addr}; 
+    }
     foreach(@{$arr}){
         print " " x $level;
         print $playlists{$_}->playlistPersistentID," -> ",$playlists{$_}->name,"\n";
-        &print_playlists(\@{$playlist_tree{$_}},$level+1,) if defined $playlist_tree{$_};
+        &print_playlists(\@{$playlist_tree{$_}},$level+1,\%playlist_tree) if defined $playlist_tree{$_};
     }
 }
 
