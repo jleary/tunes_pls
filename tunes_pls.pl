@@ -74,8 +74,9 @@ sub usage{
 FLAGS:
 --in               - The directory in which the iTunes Music Library.xml file and iTunes Music directory live.
 --out              - The directory to which the playlist files/music will be exported to.
---action           - Either `list` to get a listing of playlists and their corresponding ID numbers
-                      or `export` to export to the out directory.
+--action           - `list` to get a listing of playlists and their corresponding ID numbers.
+                     `export` to export to the out directory.
+                     `config` to use a config file.
 --playlists        - A comma delimited list of playlist ids to be exported.
 --type             - The playlist format to be exported (ether pls or m3u).
 --export_protected - Either "Yes" or "True" to export FairPlay DRM encrypted files or anything else to not export them
@@ -94,10 +95,15 @@ export_to = /tmp/export/
 export_protected = true
 
 [playlists_by_name]
-playlist_0 = 'Playlist Zero' ;Each playlist's name must be encased in single quotes
-playlist_1 = 'Playlist One'  ;Each playlist must use a unique key value
+;Each playlist's name must be encased in single quotes.
+;Each playlist must use a unique key value.
+
+playlist_0 = 'Playlist Zero'
+playlist_1 = 'Playlist One'  
 
 [playlists_by_id]
+;Each playlist must use a unique key and have a valid persistent id.
+
 playlist_0 = 6D65D1901B5A9E3B
 EOF
 

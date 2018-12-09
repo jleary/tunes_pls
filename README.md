@@ -8,7 +8,7 @@ Presently the following flags are valid
 
 + `--in`: The directory in which the iTunes Music Library.xml file and iTunes Music directory live.
 + `--out`: The directory to which the playlist files/music will be exported to.
-+ `--action`: Either `list` to get a listing of playlists and their corresponding persistent ids or `export` to export to the `out` directory.
++ `--action`: Either `list` to get a listing of playlists and their corresponding persistent ids, `export` to export to the `out` directory, or `config` to use a config file.
 + `--playlist`: A comma delimited list of playlist persistent ids to be exported.
 + `--type`: The playlist format to be exported (ether PLS or M3U).
 + `--export_protected`: Either "Yes" or "True" to export FairPlay DRM encrypted files or anything else to not export them
@@ -24,17 +24,23 @@ Config File
 -----------
 
 An example config file could be in the ini format as follows:
-```
+
+```cfg
 library   = /home/user/Music/iTunes/
 format    = m3u
 export_to = /tmp/export/
 export_protected = true
 
 [playlists_by_name]
-playlist_0 = 'Playlist Zero' ;Each playlist's name must be encased in single quotes
-playlist_1 = 'Playlist One'  ;Each playlist must use a unique key value
+;Each playlist's name must be encased in single quotes.
+;Each playlist must use a unique key value.
+
+playlist_0 = 'Playlist Zero'
+playlist_1 = 'Playlist One'  
 
 [playlists_by_id]
+;Each playlist must use a unique key and have a valid persistent id.
+
 playlist_0 = 6D65D1901B5A9E3B
 ```
 
