@@ -212,7 +212,7 @@ sub export{
             warn "Null Playlist Contents or Title" and next;
         }
         my $playlist_path = $playlists{$_}->name.".$opt{'export_to'}";
-        $playlist_path =~ s/(\/|\\)/-/g;
+        $playlist_path =~ s/(\/|\\|\?)/-/g;
         $handler->( $playlists{$_},
                     $opt{'in_dir'},
                     File::Spec->rel2abs($opt{'out_dir'}),
