@@ -35,14 +35,16 @@ sub tui{
     my $selected_playlists  ='';
     my $type                ='';
     my $export_protected    ='';
+    my $playlists_only      ='';
     my $config              ='';
-    GetOptions( 'in=s'        =>\$in_dir,
-                'out:s'       =>\$out_dir,
-                'action=s'    =>\$sub,
-                'playlists:s' =>\$selected_playlists,
-                'type:s'      =>\$type,
-                'export_protected:s' =>\$export_protected,
-                'config:s'    =>\$config,
+    GetOptions( 'in=s'              =>\$in_dir,
+                'out:s'             =>\$out_dir,
+                'action=s'          =>\$sub,
+                'playlists:s'       =>\$selected_playlists,
+                'type:s'            =>\$type,
+                'export_protected:s'=>\$export_protected,
+                'playlists_only:s'  =>\$playlists_only,
+                'config:s'          =>\$config,
 
     );
     if($sub eq 'list'){
@@ -51,13 +53,22 @@ sub tui{
         &print_playlists(undef,undef);
     }elsif($sub eq 'export'){
         my @s = split /,/, $selected_playlists;
-        $export_protected = 0;
-        $export_protected = 1 if lc $export_protected =~ /(y(|es)|true)/;
+        if(lc $playlists_only   =~ /(y(|es)|true)/){
+            $playlists_only = 1;
+        }else{
+            $playlists_only = 0;
+        }
+        if(lc $export_protected   =~ /(y(|es)|true)/){
+            $export_protected = 1;
+        }else{
+            $export_protected = 0;
+        }
         &export(selected_playlists=>\@s,
                 export_to         =>$type,
                 in_dir            =>$in_dir,
                 out_dir           =>$out_dir,
-                export_protected  =>$export_protected);
+                export_protected  =>$export_protected,
+                playlists_only    =>$playlists_only);
     }elsif($sub eq 'conf'){
         &config($config);
     
@@ -184,15 +195,17 @@ sub build_playlist_tree{
 #&export iterates through the selected playlists and passes their items to 
 #a playlist exporting function.
 #Usage:
-#    export(selected_playlists=>\@array,
-#           export_protected=>1 or 0
-#           export_to=>\&export function,
-#           path=> path of playlist and music)
+#    export(selected_playlists=>\@array,        #Selected playlists
+#           export_protected=>1 or 0,           #Export FairPlay protected files
+#           playlists_only=>1 or 0,             #Don't Export Music, just the playlists
+#           export_to=>\&export function,       #Export file type
+#           path=> path of playlist and music)  #Export path
 
 
 sub export{
     my %opt = @_;
     my $export_protected = (defined $opt{'export_protected'} && $opt{'export_protected'} == 1) ? 1:0;
+    my $playlists_only   = (defined $opt{'playlists_only'} && $opt{'playlists_only'} == 1) ? 1:0;
     my %handlers = (
         pls =>\&export_to_pls,
         m3u =>\&export_to_m3u
@@ -217,12 +230,13 @@ sub export{
                     $opt{'in_dir'},
                     File::Spec->rel2abs($opt{'out_dir'}),
                     $playlist_path,
-                    $export_protected);
+                    $export_protected,
+                    $playlists_only);
     }
 }
 
 sub export_to_pls{
-    my ($playlist,$in_dir,$out_dir,$pls_path,$export_protected) = @_;
+    my ($playlist,$in_dir,$out_dir,$pls_path,$export_protected,$playlists_only) = @_;
     my @items=$playlist->items;
     open(my $pls,'+>',"$out_dir/$pls_path") or die "Could not open pls to write.";
 
@@ -247,7 +261,7 @@ sub export_to_pls{
         print $pls "File"  , $i+1, "=", $location,"\n";
         print $pls "Title" , $i+1, "=", $items[$i]->name,"\n";
         print $pls "Length", $i+1, "=", $length  ,"\n";
-        &copy_path($in_dir,$out_dir,$location);
+        &copy_path($in_dir,$out_dir,$location) if !$playlists_only;
     }
     print $pls "NumberOfEntries=$i\n";
     print $pls "Version=2\n\n";
@@ -256,7 +270,7 @@ sub export_to_pls{
 
 }
 sub export_to_m3u{
-    my ($playlist,$in_dir,$out_dir,$m3u_path,$export_protected) = @_;
+    my ($playlist,$in_dir,$out_dir,$m3u_path,$export_protected,$playlists_only) = @_;
     my @items=$playlist->items;
     open(my $m3u,'+>',"$out_dir/$m3u_path") or die "Could not open m3u to write.";
     binmode($m3u,':utf8');
@@ -278,7 +292,7 @@ sub export_to_m3u{
         $length = ceil($_->totalTime/1000) if defined $_->totalTime;
         print $m3u "#EXTINF:",$length," ",$_->artist," - ",$_->name,"\n";
         print $m3u "$location\n";
-        &copy_path($in_dir,$out_dir,$location);
+        &copy_path($in_dir,$out_dir,$location) if !$playlists_only;
     }
     close $m3u;
 }
