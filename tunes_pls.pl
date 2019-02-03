@@ -34,16 +34,16 @@ sub tui{
     my $sub                 ='';
     my $selected_playlists  ='';
     my $type                ='';
-    my $export_protected    ='';
-    my $playlists_only      ='';
+    my $export_protected    = 0;
+    my $playlists_only      = 0;
     my $config              ='';
     GetOptions( 'in=s'              =>\$in_dir,
                 'out:s'             =>\$out_dir,
                 'action=s'          =>\$sub,
                 'playlists:s'       =>\$selected_playlists,
                 'type:s'            =>\$type,
-                'export_protected:s'=>\$export_protected,
-                'playlists_only:s'  =>\$playlists_only,
+                'export-protected'  =>\$export_protected,
+                'playlists-only'    =>\$playlists_only,
                 'config:s'          =>\$config,
 
     );
@@ -53,16 +53,6 @@ sub tui{
         &print_playlists(undef,undef);
     }elsif($sub eq 'export'){
         my @s = split /,/, $selected_playlists;
-        if(lc $playlists_only   =~ /(y(|es)|true)/){
-            $playlists_only = 1;
-        }else{
-            $playlists_only = 0;
-        }
-        if(lc $export_protected   =~ /(y(|es)|true)/){
-            $export_protected = 1;
-        }else{
-            $export_protected = 0;
-        }
         &export(selected_playlists=>\@s,
                 export_to         =>$type,
                 in_dir            =>$in_dir,
@@ -90,32 +80,18 @@ FLAGS:
                      `config` to use a config file.
 --playlists        - A comma delimited list of playlist ids to be exported.
 --type             - The playlist format to be exported (ether pls or m3u).
---export_protected - Either "Yes" or "True" to export FairPlay DRM encrypted files or anything else to not export them
+--export-protected - Export FairPlay DRM encrypted files
+--playlists-only   - Generate playlist files without copying music files
 --config           - Path to config file
 
 An example usage would be as follows:
 
 ./tunes_pls.pl --in ~/Music/iTunes/ --action list #To List 
 ./tunes_pls.pl --in ~/Music/iTunes/ --action export --type pls --out /tmp/ --playlists 6D65D1901B5A9E3B,A212534145F9BE30 #To Export
-./tunes_pls.pl --action conf --conf ~/.config/tunes_pls.cfg #To use a config file
+./tunes_pls.pl --action conf --config ~/.config/tunes_pls.cfg #To use a config file
 
-An example config file could be in the ini format as follows:
-library   = /home/user/Music/iTunes/
-format    = m3u
-export_to = /tmp/export/
-export_protected = true
+An example config file is included in the repo.
 
-[playlists_by_name]
-;Each playlist's name must be encased in single quotes.
-;Each playlist must use a unique key value.
-
-playlist_0 = 'Playlist Zero'
-playlist_1 = 'Playlist One'  
-
-[playlists_by_id]
-;Each playlist must use a unique key and have a valid persistent id.
-
-playlist_0 = 6D65D1901B5A9E3B
 EOF
 
 }

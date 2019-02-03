@@ -11,8 +11,9 @@ Presently the following flags are valid
 + `--action`: Either `list` to get a listing of playlists and their corresponding persistent ids, `export` to export to the `out` directory, or `config` to use a config file.
 + `--playlist`: A comma delimited list of playlist persistent ids to be exported.
 + `--type`: The playlist format to be exported (ether PLS or M3U).
-+ `--export_protected`: Either "Yes" or "True" to export FairPlay DRM encrypted files or anything else to not export them
-+ `--config`:  Path to config file
++ `--export-protected`: - Export FairPlay DRM encrypted files.
++ `--playlists-only`:   - Generate playlist files without copying music files.
++ `--config`:  Path to config file.
 An example usage would be as follows:
 ```
 ./tunes_pls.pl --in ~/Music/iTunes/ --action list #To List 
