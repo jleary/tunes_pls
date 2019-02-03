@@ -125,8 +125,15 @@ sub config{
     }else{
         $cfg->{_}->{'export_protected'} = 0;
     }
+    if(defined $cfg->{_}->{'playlists_only'} && $cfg->{_}->{'playlists_only'}=~/(y(|es)|true)/i){
+        $cfg->{_}->{'playlists_only'} = 1;
+    }else{
+        $cfg->{_}->{'playlists_only'} = 0;
+    }
     &export(selected_playlists=>\@persistent_ids,
             export_to=>$cfg->{_}->{'format'},
+            export_protected=>$cfg->{_}->{'export_protected'},
+            playlists_only=>$cfg->{_}->{'playlists_only'},
             in_dir=>$cfg->{_}->{'library'},
             out_dir=>$cfg->{_}->{'export_to'},);
 }

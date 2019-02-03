@@ -31,6 +31,7 @@ library   = /home/user/Music/iTunes/
 format    = m3u
 export_to = /tmp/export/
 export_protected = true
+playlists_only = false
 
 [playlists_by_name]
 ;Each playlist's name must be encased in single quotes.
